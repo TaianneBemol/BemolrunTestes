@@ -1071,16 +1071,39 @@ function exportCSV() {
   let rows, filename;
   if (page === 'page-corridas') {
     const { individuais } = DATA;
+    const search = document.getElementById('corridaSearch').value.toLowerCase().trim();
+    const modal  = document.getElementById('corridaModalFilter').value;
+    const genero = document.getElementById('corridaGeneroFilter').value;
+    const source = document.getElementById('corridaSourceFilter').value;
+
+    const filtered = individuais.filter(r => {
+      if (corridaCity !== 'all' && r.cidade !== corridaCity) return false;
+      if (modal  !== 'all' && r.modal  !== modal)  return false;
+      if (genero !== 'all' && r.genero !== genero) return false;
+      if (source !== 'all' && r.source !== source) return false;
+      if (search) {
+        const searchNorm = search.replace(/[\.\-\/]/g, '');
+        const cpfNorm    = r.cpf.replace(/[\.\-\/]/g, '');
+        const hay        = (r.nome + cpfNorm + r.email).toLowerCase();
+        const hayRaw     = (r.nome + r.cpf + r.email).toLowerCase();
+        if (!hay.includes(searchNorm) && !hayRaw.includes(search)) return false;
+      }
+      return true;
+    });
+
+    const genLabel = { F:'Feminino', M:'Masculino' };
+    const payLabel = { PIX:'PIX', CB:'Cartão/Boleto' };
     rows = [['Nome','CPF','Email','Cidade','Modalidade','Gênero','Camiseta','Pagamento','Valor','Fonte','Data']];
-    individuais.forEach(r => rows.push([
+    filtered.forEach(r => rows.push([
       r.nome, r.cpf, r.email, r.cidade,
       r.modal==='KIDS'?'Kids':r.modal.replace('KM',' km'),
-      r.genero==='F'?'Feminino':r.genero==='M'?'Masculino':r.genero,
-      r.tamanho, r.pagto,
+      genLabel[r.genero] || r.genero || '',
+      r.tamanho, payLabel[r.pagto]||r.pagto,
       Number(r.valor).toFixed(2),
       r.source, r.data
     ]));
-    filename = 'bemolrun2026-inscritos.csv';
+    const cityLabel = corridaCity === 'all' ? 'todas-cidades' : corridaCity.toLowerCase().replace(/\s+/g,'-');
+    filename = `bemolrun2026-${cityLabel}.csv`;
   } else if(page==='page-camisetas'){
     const {cidades,sizeByCityGender}=DATA;
     rows=[['Cidade','Gênero',...SIZES,'Total']];
