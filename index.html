@@ -418,7 +418,7 @@ const TICK_SHEET  = 'Vendas - Tickets';
 
 const RACE_DATES = {
   'Manaus':      '2026-08-30',
-  'Manaus Kids': '2026-08-29',
+  'Manaus Kids': '2026-08-30',
   'Porto Velho': '2026-07-26',
   'Rio Branco':  '2026-07-12',
   'Boa Vista':   '2026-10-11',
@@ -981,21 +981,28 @@ function renderCorridasTab() {
 
   // Race dates banner
   const today = new Date().toISOString().slice(0,10);
-  const banner = Object.entries(RACE_DATES)
+  const entries = Object.entries(RACE_DATES)
     .filter(([c]) => c !== 'Manaus Kids')
-    .sort((a,b) => a[1].localeCompare(b[1]))
-    .map(([city, iso]) => {
-      const done  = iso < today;
-      const label = iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4);
-      const dot   = done ? '#1D9E75' : '#EF9F27';
-      const tag   = done
-        ? `<span style="background:#EAF3DE;color:#1D6B44;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:500">Concluída</span>`
-        : `<span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:500">Próxima</span>`;
-      return `<span style="display:inline-flex;align-items:center;gap:5px">
-        <span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span>
-        <strong>${city}</strong> ${label} ${tag}
-      </span>`;
-    }).join('<span style="color:var(--border-mid);margin:0 6px">·</span>');
+    .sort((a,b) => a[1].localeCompare(b[1]));
+
+  // Find the next upcoming race (first one after today)
+  const nextRace = entries.find(([, iso]) => iso >= today)?.[0];
+
+  const banner = entries.map(([city, iso]) => {
+    const done  = iso < today;
+    const label = iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4);
+    const dot   = done ? '#1D9E75' : '#EF9F27';
+    const isNext = city === nextRace;
+    const tag   = done
+      ? `<span style="background:#EAF3DE;color:#1D6B44;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:500">Concluída</span>`
+      : isNext
+        ? `<span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:500">Próxima</span>`
+        : '';
+    return `<span style="display:inline-flex;align-items:center;gap:5px">
+      <span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span>
+      <strong>${city}</strong> ${label} ${tag}
+    </span>`;
+  }).join('<span style="color:var(--border-mid);margin:0 6px">·</span>');
   document.getElementById('raceDateBanner').innerHTML = banner;
 
   renderCorridasPage();
@@ -1047,7 +1054,7 @@ function renderCorridasPage() {
   document.getElementById('corridasCount').textContent =
     `${fmt(total)} inscrito${total!==1?'s':''} encontrado${total!==1?'s':''}`;
 
-  const genLabel = { F:'Feminino', M:'Masculino' };
+  const genLabel = { F:'Fem.', M:'Masc.' };
   const payLabel = { PIX:'PIX', CB:'Cartão/Boleto' };
 
   document.getElementById('corridasBody').innerHTML = slice.map(r => {
@@ -1066,12 +1073,12 @@ function renderCorridasPage() {
       : `<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#EF9F27;flex-shrink:0"></span>${raceDate}</span>`;
     return `<tr>
       <td style="font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.nome}">${r.nome||'—'}</td>
-      <td><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0"></span>${r.cidade}</span></td>
+      <td style="white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0"></span>${r.cidade}</span></td>
       <td>${mLabel}</td>
       <td>${genLabel[r.genero]||r.genero||'—'}</td>
       <td style="font-weight:500">${r.tamanho||'—'}</td>
       <td>${payLabel[r.pagto]||r.pagto||'—'}</td>
-      <td style="font-weight:500">R$ ${Number(r.valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="font-weight:500;white-space:nowrap">R$ ${Number(r.valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
       <td><span class="source-badge source-${srcCls}">${r.source}</span></td>
       <td style="color:var(--text-secondary)">${dataFmt}</td>
       <td style="${raceStyle}">${raceDot}</td>
@@ -1130,7 +1137,7 @@ function exportCSV() {
       return true;
     });
 
-    const genLabel = { F:'Feminino', M:'Masculino' };
+    const genLabel = { F:'Fem.', M:'Masc.' };
     const payLabel = { PIX:'PIX', CB:'Cartão/Boleto' };
     rows = [['Nome','CPF','Email','Cidade','Modalidade','Gênero','Camiseta','Pagamento','Valor','Fonte','Data']];
     filtered.forEach(r => rows.push([
