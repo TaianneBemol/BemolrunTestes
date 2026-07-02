@@ -163,6 +163,10 @@
     .city-size-fill { height: 100%; border-radius: 3px; }
     .city-size-n { min-width: 30px; text-align: right; color: var(--text-secondary); }
 
+    .export-xlsx-btn { display:flex; align-items:center; gap:6px; font-size:13px; font-family:var(--font); font-weight:500; padding:7px 14px; border-radius:var(--radius-md); border:0.5px solid #1D9E75; background:#EAF3DE; color:#1D6B44; cursor:pointer; white-space:nowrap; transition:background 0.15s; }
+    .export-xlsx-btn:hover { background:#d4edcc; }
+    @media (prefers-color-scheme:dark) { .export-xlsx-btn { background:#162a15; border-color:#1D9E75; color:#4ade80; } .export-xlsx-btn:hover { background:#1e3a1c; } }
+
     /* CORRIDAS PAGE */
     .city-btn-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:1.2rem; }
     .city-btn { font-size:13px; font-family:var(--font); font-weight:500; padding:7px 16px; border-radius:20px; border:1.5px solid var(--border-mid); background:var(--bg-primary); color:var(--text-secondary); cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:6px; }
@@ -371,6 +375,10 @@
         <option value="Ticket Sport">Ticket Sport</option>
       </select>
       <span class="corridas-count" id="corridasCount"></span>
+      <button class="export-xlsx-btn" onclick="exportXLSX()" title="Baixar Excel com os dados filtrados">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v2a1 1 0 001 1h8a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Baixar XLSX
+      </button>
     </div>
 
     <div class="table-wrap">
@@ -592,14 +600,14 @@ function processData(sapRaw, tickRaw) {
 
   // Individual rows for Corridas tab
   const individuais = all.map(r => ({
-    nome:    r.nome    || '—',
-    cpf:     r.cpf     || '—',
-    email:   r.email   || '—',
+    nome:    r.nome    || '',
+    cpf:     r.cpf     || '',
+    email:   r.email   || '',
     cidade:  r.cidade,
     modal:   r.modal,
     genero:  r.genero  || '',
-    tamanho: r.tamanho || '—',
-    pagto:   r.pagto   || '—',
+    tamanho: r.tamanho || '',
+    pagto:   r.pagto   || '',
     valor:   r.valor,
     source:  r.source,
     data:    r.data,
@@ -983,8 +991,11 @@ function renderCorridasPage() {
     if (genero !== 'all' && r.genero !== genero) return false;
     if (source !== 'all' && r.source !== source) return false;
     if (search) {
-      const hay = (r.nome + r.cpf + r.email).toLowerCase();
-      if (!hay.includes(search)) return false;
+      const searchNorm = search.replace(/[\.\-\/]/g, '');
+      const cpfNorm    = r.cpf.replace(/[\.\-\/]/g, '');
+      const hay        = (r.nome + cpfNorm + r.email).toLowerCase();
+      const hayRaw     = (r.nome + r.cpf + r.email).toLowerCase();
+      if (!hay.includes(searchNorm) && !hayRaw.includes(search)) return false;
     }
     return true;
   });
@@ -1090,6 +1101,69 @@ function exportCSV() {
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.map(r=>r.join(',')).join('\n'));
   a.download=filename; a.click();
+}
+
+// ── EXPORT XLSX (Corridas filtradas) ──────────────────────────────────────
+function exportXLSX() {
+  const { individuais } = DATA;
+  const search = document.getElementById('corridaSearch').value.toLowerCase().trim();
+  const modal  = document.getElementById('corridaModalFilter').value;
+  const genero = document.getElementById('corridaGeneroFilter').value;
+  const source = document.getElementById('corridaSourceFilter').value;
+
+  let filtered = individuais.filter(r => {
+    if (corridaCity !== 'all' && r.cidade !== corridaCity) return false;
+    if (modal  !== 'all' && r.modal  !== modal)  return false;
+    if (genero !== 'all' && r.genero !== genero) return false;
+    if (source !== 'all' && r.source !== source) return false;
+    if (search) {
+      const searchNorm = search.replace(/[\.\-\/]/g, '');
+      const cpfNorm    = r.cpf.replace(/[\.\-\/]/g, '');
+      const hay        = (r.nome + cpfNorm + r.email).toLowerCase();
+      const hayRaw     = (r.nome + r.cpf + r.email).toLowerCase();
+      if (!hay.includes(searchNorm) && !hayRaw.includes(search)) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    let va = a[corridaSort.key] ?? '';
+    let vb = b[corridaSort.key] ?? '';
+    if (corridaSort.key === 'valor') { va = Number(va); vb = Number(vb); }
+    else { va = String(va).toLowerCase(); vb = String(vb).toLowerCase(); }
+    return va < vb ? -corridaSort.dir : va > vb ? corridaSort.dir : 0;
+  });
+
+  const genLabel = { F:'Feminino', M:'Masculino' };
+  const payLabel = { PIX:'PIX', CB:'Cartão/Boleto' };
+
+  const headers = ['Nome','CPF','E-mail','Cidade','Modalidade','Gênero','Camiseta','Pagamento','Valor (R$)','Fonte','Data'];
+  const rows = filtered.map(r => [
+    r.nome   || '',
+    r.cpf    || '',
+    r.email  || '',
+    r.cidade,
+    r.modal === 'KIDS' ? 'Kids' : r.modal.replace('KM',' km'),
+    genLabel[r.genero] || r.genero || '',
+    r.tamanho || '',
+    payLabel[r.pagto] || r.pagto || '',
+    Number(r.valor),
+    r.source,
+    r.data ? r.data.slice(8,10)+'/'+r.data.slice(5,7)+'/'+r.data.slice(0,4) : '',
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [
+    {wch:28},{wch:16},{wch:32},{wch:14},{wch:12},
+    {wch:10},{wch:10},{wch:16},{wch:12},{wch:14},{wch:12},
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const sheetName = corridaCity === 'all' ? 'Todos os inscritos' : corridaCity.slice(0,31);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  const cityLabel = corridaCity === 'all' ? 'todas-cidades' : corridaCity.toLowerCase().replace(/\s+/g,'-');
+  XLSX.writeFile(wb, `bemolrun2026-${cityLabel}.xlsx`);
 }
 </script>
 </body>
